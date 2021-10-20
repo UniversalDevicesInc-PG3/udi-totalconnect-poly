@@ -1,12 +1,8 @@
-try:
-    import polyinterface
-except ImportError:
-    import pgc_interface as polyinterface
-
+import udi_interface
 from total_connect_client import TotalConnectClient
 from enum import Enum
 
-LOGGER = polyinterface.LOGGER
+LOGGER = udi_interface.LOGGER
 
 
 class ArmStatus(Enum):
@@ -52,7 +48,7 @@ armStatusMap = {
 }
 
 
-class SecurityPanel(polyinterface.Node):
+class SecurityPanel(udi_interface.Node):
 
     def __init__(self, controller, primary, address, name, tc, loc_name, loc_id, allow_disarming=False):
         super(SecurityPanel, self).__init__(controller, primary, address, name)
@@ -60,6 +56,8 @@ class SecurityPanel(polyinterface.Node):
         self.loc_name = loc_name
         self.loc_id = loc_id
         self.allow_disarming = allow_disarming
+
+        controller.subscribe(controller.START, self.start, address)
 
     def start(self):
         self.query()

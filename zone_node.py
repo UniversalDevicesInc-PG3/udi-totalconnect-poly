@@ -1,12 +1,8 @@
-try:
-    import polyinterface
-except ImportError:
-    import pgc_interface as polyinterface
-
+import udi_interface
 from total_connect_client import TotalConnectClient
 from enum import Enum
 
-LOGGER = polyinterface.LOGGER
+LOGGER = udi_interface.LOGGER
 
 
 class ZoneStatus(Enum):
@@ -32,7 +28,7 @@ zoneStatusMap = {
 }
 
 
-class Zone(polyinterface.Node):
+class Zone(udi_interface.Node):
 
     def __init__(self, controller, primary, address, name, zone_id, tc, loc_name, loc_id):
         super(Zone, self).__init__(controller, primary, address, name)
@@ -40,6 +36,8 @@ class Zone(polyinterface.Node):
         self.tc = tc
         self.loc_name = loc_name
         self.loc_id = loc_id
+
+        controller.susbscribe(controller.START, self.start, address)
 
     def start(self):
         self.query()

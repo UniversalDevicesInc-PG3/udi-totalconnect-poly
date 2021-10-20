@@ -1,6 +1,6 @@
 {
     "name": "TotalConnect",
-    "docs": "https://github.com/dbarentine/udi-totalconnect-poly",
+    "docs": "https://github.com/UniversalDevicesInc-PG3/udi-totalconnect-poly",
     "type": "python3",
     "executable": "totalconnect-poly.py",
     "install": "install.sh",
@@ -9,14 +9,32 @@
     "notice": "Your disclaimer here",
     "shortPoll": "120",
     "longPoll": "240",
+	"logLevel": "INFO",
+	"customParams": {
+		"user": "",
+		"password": "",
+		"include_non_bypassable_zone": false,
+		"allow_disarming": false,
+		"refresh_auth_interval": 120,
+		"zone_query_dealy_ms": 500
+	},
     "credits": [
         {
             "title": "A node server for integration with Honeywell Total Connect v2",
             "author": "Dane Barentine",
             "version": "1.3.5",
             "date": "March 20, 2021",
-            "source": "https://github.com/dbarentine/udi-totalconnect-poly",
-            "license": "https://raw.githubusercontent.com/dbarentine/udi-totalconnect-poly/master/LICENSE"
+            "source": "https://github.com/UniversalDevicesInc-PG3/udi-totalconnect-poly",
+            "license": "https://raw.githubusercontent.com/UniversalDevicesInc-PG3/udi-totalconnect-poly/master/LICENSE"
         }
-    ]
+    ],
+    "store": {
+        "developer": "bpaauwe@bobsplace.com",
+        "purchaseOptions": [
+            {
+                "isPerpetual": true,
+                "price": 0
+            }
+        ]
+    }
 }

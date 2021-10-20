@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 
-try:
-    import polyinterface
-except ImportError:
-    import pgc_interface as polyinterface
+import udi_interface
 import sys
 import re
 import schedule
@@ -13,7 +10,7 @@ from total_connect_client import TotalConnectClient
 from security_panel_node import SecurityPanel
 from zone_node import Zone
 
-LOGGER = polyinterface.LOGGER
+LOGGER = udi_interface.LOGGER
 VALID_DEVICES = ['Security Panel',
                  'Security System',
                  'L5100-WiFi',
@@ -28,32 +25,10 @@ VALID_DEVICES = ['Security Panel',
                  ]
 
 
-class Controller(polyinterface.Controller):
-    """
-    Class Variables:
-    self.nodes: Dictionary of nodes. Includes the Controller node. Keys are the node addresses
-    self.name: String name of the node
-    self.address: String Address of Node, must be less than 14 characters (ISY limitation)
-    self.polyConfig: Full JSON config dictionary received from Polyglot for the controller Node
-    self.added: Boolean Confirmed added to ISY as primary node
-    self.config: Dictionary, this node's Config
-
-    Class Methods (not including the Node methods):
-    start(): Once the NodeServer config is received from Polyglot this method is automatically called.
-    addNode(polyinterface.Node, update = False): Adds Node to self.nodes and polyglot/ISY. This is called
-        for you on the controller itself. Update = True overwrites the existing Node data.
-    updateNode(polyinterface.Node): Overwrites the existing node data here and on Polyglot.
-    delNode(address): Deletes a Node from the self.nodes/polyglot and ISY. Address is the Node's Address
-    longPoll(): Runs every longPoll seconds (set initially in the server.json or default 10 seconds)
-    shortPoll(): Runs every shortPoll seconds (set initially in the server.json or default 30 seconds)
-    query(): Queries and reports ALL drivers for ALL nodes to the ISY.
-    getDriver('ST'): gets the current value from Polyglot for driver 'ST' returns a STRING, cast as needed
-    runForever(): Easy way to run forever without maxing your CPU or doing some silly 'time.sleep' nonsense
-                  this joins the underlying queue query thread and just waits for it to terminate
-                  which never happens.
-    """
-    def __init__(self, polyglot):
-        super(Controller, self).__init__(polyglot)
+class Controller(udi_interface.Node):
+    def __init__(self, polyglot, primary, address, name):
+        super(Controller, self).__init__(polyglot, primary, address, name)
+        self.poly = polyglot
         self.name = "Total Connect Controller"
         self.user = ""
         self.password = ""
@@ -64,43 +39,81 @@ class Controller(polyinterface.Controller):
         self.tc = None
         self.filter_regex = r'[^a-zA-Z0-9_\- \t\n\r\f\v]+'
 
+        polyglot.subscribe(polyglot.START, self.start, address)
+        polyglot.subscribe(polyglot.CUSTOMPARAMS, self.parameterHandler)
+        polyglot.subscribe(polyglot.POLL, self.poll)
+
+        polyglot.ready()
+        polyglot.addNode(self)
+
         # Don't enable in deployed node server. I use these so I can run/debug directly in IntelliJ.
         # LOGGER.debug("Profile Num: " + os.environ.get('PROFILE_NUM'))
         # LOGGER.debug("MQTT Host: " + os.environ.get('MQTT_HOST'))
         # LOGGER.debug("MQTT Port: " + os.environ.get('MQTT_PORT'))
         # LOGGER.debug("Token: " + os.environ.get('TOKEN'))
 
+    def parameterHandler(self, params):
+        self.poly.Notices.clear()
+
+        if 'user' in params:
+            self.user = params['user']
+        else:
+            LOGGER.error('check_params: user not defined in customParams, please add it.  Using {}'.format(self.user))
+
+        if 'password' in params:
+            self.password = params['password']
+        else:
+            LOGGER.error('check_params: password not defined in customParams, please add it.  Using {}'.format(self.password))
+
+        if 'include_non_bypassable_zones' in params:
+            self.include_non_bypassable_zones = params['include_non_bypassable_zones']
+
+        if 'allow_disarming' in params:
+            self.allow_disarming = params['allow_disarming']
+
+        if 'refresh_auth_interval' in params:
+            self.refresh_auth_interval = params['refresh_auth_interval']
+
+        if 'zone_query_delay_ms' in params:
+            self.zone_query_delay_ms = params['zone_query_delay_ms']
+
+        if self.user == "" or self.password == "":
+            self.poly.Notices['mynotice'] = 'Please set proper user and password in configuration page, and restart this nodeserver'
+            return False
+
+        self.discover()
+
     def start(self):
         LOGGER.info('Started Total Connect Nodeserver')
-        if self.check_params():
-            self.discover()
+        while self.password == "" or self.user == "":
+            time.sleep(1)
 
-            schedule.every(int(self.refresh_auth_interval)).minutes.do(self.authenticate)
-            self.setDriver('ST', 1)
+        schedule.every(int(self.refresh_auth_interval)).minutes.do(self.authenticate)
+        self.setDriver('ST', 1)
 
-    def shortPoll(self):
-        timeout = int(self.zone_query_delay_ms)
-        for node in self.nodes:
-            if isinstance(self.nodes[node], SecurityPanel):
-                self.nodes[node].query()
-                self.nodes[node].reportDrivers()
-                time.sleep(timeout / 1000)
-
-    def longPoll(self):
-        timeout = int(self.zone_query_delay_ms)
-        schedule.run_pending()
-        for node in self.nodes:
-            if isinstance(self.nodes[node], Zone):
-                self.nodes[node].query()
-                self.nodes[node].reportDrivers()
-                time.sleep(timeout / 1000)
+    def poll(self, polltype):
+        if 'shortPoll' in polltype:
+            timeout = int(self.zone_query_delay_ms)
+            for node in self.poly.nodes():
+                if isinstance(node, SecurityPanel):
+                    node.query()
+                    node.reportDrivers()
+                    time.sleep(timeout / 1000)
+        else:
+            timeout = int(self.zone_query_delay_ms)
+            schedule.run_pending()
+            for node in self.poly.nodes():
+                if isinstance(node, Zone):
+                    node.query()
+                    node.reportDrivers()
+                    time.sleep(timeout / 1000)
 
     def query(self):
         timeout = int(self.zone_query_delay_ms)
-        for node in self.nodes:
-            if self.nodes[node] is not self:
-                self.nodes[node].query()
-                self.nodes[node].reportDrivers()
+        for node in self.poly.nodes():
+            if node is not self:
+                node.query()
+                node.reportDrivers()
                 time.sleep(timeout / 1000)
             else:
                 self.reportDrivers()
@@ -147,7 +160,7 @@ class Controller(polyinterface.Controller):
 
                     # If we wanted to support other device types it would go here
         except Exception as ex:
-            self.addNotice({'discovery_failed': 'Discovery failed please check logs for a more detailed error.'})
+            self.poly.Notices['discovery_failed'] = 'Discovery failed please check logs for a more detailed error.'
             LOGGER.exception("Discovery failed with error %s", ex)
 
     def add_security_device(self, loc_id, loc_name, device, update):
@@ -155,7 +168,8 @@ class Controller(polyinterface.Controller):
         device_addr = "panel_" + str(device['DeviceID'])
         LOGGER.debug("Adding security device {} with name {} for location {}".format(device_addr, device_name, loc_name))
 
-        self.addNode(SecurityPanel(self, device_addr, device_addr, loc_name + " - " + device_name, self.tc, loc_name, loc_id, bool(strtobool(self.allow_disarming))), update)
+        if not self.poly.getNode(device_addr):
+            self.poly.addNode(SecurityPanel(self.poly, device_addr, device_addr, loc_name + " - " + device_name, self.tc, loc_name, loc_id, bool(strtobool(self.allow_disarming))), update)
 
         # create zone nodes
         # We are using GetPanelMetaDataAndFullStatusEx_V1 because we want the extended zone info
@@ -181,7 +195,8 @@ class Controller(polyinterface.Controller):
         zone_addr = "z_{}_{}".format(device_id, str(zone.ZoneID))
 
         LOGGER.debug("Adding zone {} with name {} for location {}".format(zone_addr, zone_name, loc_name))
-        self.addNode(Zone(self, device_addr, zone_addr, zone_name, zone.ZoneID, self.tc, loc_name, loc_id), update)
+        if not self.poly.getNode(zone_addr):
+            self.poly.addNode(Zone(self.poly, device_addr, zone_addr, zone_name, zone.ZoneID, self.tc, loc_name, loc_id), update)
 
     def delete(self):
         LOGGER.info('Total Connect NS Deleted')
@@ -189,56 +204,10 @@ class Controller(polyinterface.Controller):
     def stop(self):
         LOGGER.debug('Total Connect NS stopped.')
 
-    def check_params(self):
-        if 'user' in self.polyConfig['customParams']:
-            self.user = self.polyConfig['customParams']['user']
-        else:
-            LOGGER.error('check_params: user not defined in customParams, please add it.  Using {}'.format(self.user))
-
-        if 'password' in self.polyConfig['customParams']:
-            self.password = self.polyConfig['customParams']['password']
-        else:
-            LOGGER.error('check_params: password not defined in customParams, please add it.  Using {}'.format(self.password))
-
-        if 'include_non_bypassable_zones' in self.polyConfig['customParams']:
-            self.include_non_bypassable_zones = self.polyConfig['customParams']['include_non_bypassable_zones']
-
-        if 'allow_disarming' in self.polyConfig['customParams']:
-            self.allow_disarming = self.polyConfig['customParams']['allow_disarming']
-
-        if 'refresh_auth_interval' in self.polyConfig['customParams']:
-            self.refresh_auth_interval = self.polyConfig['customParams']['refresh_auth_interval']
-
-        if 'zone_query_delay_ms' in self.polyConfig['customParams']:
-            self.zone_query_delay_ms = self.polyConfig['customParams']['zone_query_delay_ms']
-
-        # Make sure they are in the params
-        self.addCustomParam({'password': self.password, 'user': self.user, "include_non_bypassable_zones": self.include_non_bypassable_zones, "allow_disarming": self.allow_disarming, "refresh_auth_interval": self.refresh_auth_interval, "zone_query_delay_ms": self.zone_query_delay_ms})
-
-        # Remove all existing notices
-        self.removeNoticesAll()
-        # Add a notice if they need to change the user/password from the default.
-        if self.user == "" or self.password == "":
-            self.addNotice({'mynotice': 'Please set proper user and password in configuration page, and restart this nodeserver'})
-            return False
-        else:
-            return True
-
-    def remove_notices_all(self,command):
-        LOGGER.info('remove_notices_all:')
-        # Remove all existing notices
-        self.removeNoticesAll()
-
-    def update_profile(self,command):
-        LOGGER.info('update_profile:')
-        st = self.poly.installprofile()
-        return st
 
     id = 'controller'
     commands = {
         'DISCOVER': discover,
-        'UPDATE_PROFILE': update_profile,
-        'REMOVE_NOTICES_ALL': remove_notices_all,
         'QUERY': query
     }
 
@@ -247,9 +216,11 @@ class Controller(polyinterface.Controller):
 
 if __name__ == "__main__":
     try:
-        polyglot = polyinterface.Interface('TotalConnect')
+        polyglot = udi_interface.Interface([])
         polyglot.start()
-        control = Controller(polyglot)
-        control.runForever()
+        polyglot.updateProfile()
+        polyglot.setCustomParamsDoc()
+        Controller(polyglot, 'controller', 'controller', 'TotalConnect')
+        polyglot.runForever()
     except (KeyboardInterrupt, SystemExit):
         sys.exit(0)
