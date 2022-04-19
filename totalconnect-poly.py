@@ -44,7 +44,7 @@ class Controller(udi_interface.Node):
         polyglot.subscribe(polyglot.POLL, self.poll)
 
         polyglot.ready()
-        polyglot.addNode(self)
+        polyglot.addNode(self, conn_status="ST")
 
         # Don't enable in deployed node server. I use these so I can run/debug directly in IntelliJ.
         # LOGGER.debug("Profile Num: " + os.environ.get('PROFILE_NUM'))
