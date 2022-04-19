@@ -1,3 +1,3 @@
-udi_interface>=3.0.18
+udi_interface>=3.0.40
 total-connect-client==0.56
 schedule>=0.6.0
