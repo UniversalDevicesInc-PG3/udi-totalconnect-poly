@@ -169,7 +169,7 @@ class Controller(udi_interface.Node):
         LOGGER.debug("Adding security device {} with name {} for location {}".format(device_addr, device_name, loc_name))
 
         if not self.poly.getNode(device_addr):
-            self.poly.addNode(SecurityPanel(self.poly, device_addr, device_addr, loc_name + " - " + device_name, self.tc, loc_name, loc_id, self.allow_disarming, update)
+            self.poly.addNode(SecurityPanel(self.poly, device_addr, device_addr, loc_name + " - " + device_name, self.tc, loc_name, loc_id, self.allow_disarming, update))
 
         # create zone nodes
         # We are using GetPanelMetaDataAndFullStatusEx_V1 because we want the extended zone info
@@ -217,7 +217,7 @@ class Controller(udi_interface.Node):
 if __name__ == "__main__":
     try:
         polyglot = udi_interface.Interface([])
-        polyglot.start('2.0.1')
+        polyglot.start('2.0.2')
         polyglot.updateProfile()
         polyglot.setCustomParamsDoc()
         Controller(polyglot, 'controller', 'controller', 'TotalConnect')
