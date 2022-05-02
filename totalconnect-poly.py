@@ -32,8 +32,8 @@ class Controller(udi_interface.Node):
         self.name = "Total Connect Controller"
         self.user = ""
         self.password = ""
-        self.include_non_bypassable_zones = "false"
-        self.allow_disarming = "false"
+        self.include_non_bypassable_zones = False
+        self.allow_disarming = False
         self.refresh_auth_interval = "120"
         self.zone_query_delay_ms = "500"
         self.tc = None
@@ -169,7 +169,7 @@ class Controller(udi_interface.Node):
         LOGGER.debug("Adding security device {} with name {} for location {}".format(device_addr, device_name, loc_name))
 
         if not self.poly.getNode(device_addr):
-            self.poly.addNode(SecurityPanel(self.poly, device_addr, device_addr, loc_name + " - " + device_name, self.tc, loc_name, loc_id, bool(strtobool(self.allow_disarming))), update)
+            self.poly.addNode(SecurityPanel(self.poly, device_addr, device_addr, loc_name + " - " + device_name, self.tc, loc_name, loc_id, self.allow_disarming, update)
 
         # create zone nodes
         # We are using GetPanelMetaDataAndFullStatusEx_V1 because we want the extended zone info
@@ -182,7 +182,7 @@ class Controller(udi_interface.Node):
                 raise Exception("No zones were found for {} - {} \n{}".format(device_name, device_addr, panel_data))
 
             for zone in zones:
-                if not bool(zone.CanBeBypassed) and not bool(strtobool(self.include_non_bypassable_zones)):
+                if not bool(zone.CanBeBypassed) and not self.include_non_bypassable_zones:
                     LOGGER.debug("Skipping zone {} with name {}".format(zone.ZoneID, zone.ZoneDescription))
                     continue
 
@@ -217,7 +217,7 @@ class Controller(udi_interface.Node):
 if __name__ == "__main__":
     try:
         polyglot = udi_interface.Interface([])
-        polyglot.start('2.0.0')
+        polyglot.start('2.0.1')
         polyglot.updateProfile()
         polyglot.setCustomParamsDoc()
         Controller(polyglot, 'controller', 'controller', 'TotalConnect')

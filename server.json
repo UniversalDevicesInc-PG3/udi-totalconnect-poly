@@ -22,8 +22,8 @@
         {
             "title": "A node server for integration with Honeywell Total Connect v2",
             "author": "Dane Barentine",
-            "version": "2.0.0",
-            "date": "March 20, 2021",
+            "version": "2.0.1",
+            "date": "May 2, 2022",
             "source": "https://github.com/UniversalDevicesInc-PG3/udi-totalconnect-poly",
             "license": "https://raw.githubusercontent.com/UniversalDevicesInc-PG3/udi-totalconnect-poly/master/LICENSE"
         }
