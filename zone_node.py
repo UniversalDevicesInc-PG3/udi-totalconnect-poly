@@ -37,7 +37,7 @@ class Zone(udi_interface.Node):
         self.loc_name = loc_name
         self.loc_id = loc_id
 
-        controller.susbscribe(controller.START, self.start, address)
+        controller.subscribe(controller.START, self.start, address)
 
     def start(self):
         self.query()
