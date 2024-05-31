@@ -217,7 +217,7 @@ class Controller(udi_interface.Node):
 if __name__ == "__main__":
     try:
         polyglot = udi_interface.Interface([])
-        polyglot.start('2.0.4')
+        polyglot.start('2.0.5')
         polyglot.updateProfile()
         polyglot.setCustomParamsDoc()
         Controller(polyglot, 'controller', 'controller', 'TotalConnect')
